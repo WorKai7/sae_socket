@@ -6,10 +6,12 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #define PORT 5000
 #define BUFFER_SIZE 256
 
+// Fonction renvoyant 1 si la grille est pleine et 0 sinon
 int estPleine(char grille[3][3])
 {
     for (int i = 0; i < 3; i++)
@@ -29,10 +31,10 @@ int estPleine(char grille[3][3])
 int main(int argc, char *argv[])
 {
     // Création du socket
-    int socketEcoute = socket(AF_INET, SOCK_STREAM, 0);
-    if (socketEcoute < 0)
+    int socketServeur = socket(AF_INET, SOCK_STREAM, 0);
+    if (socketServeur < 0)
     {
-        perror("Erreur dans la création de socket");
+        perror("Erreur dans la création de socket\n");
         exit(-1);
     }
 
@@ -52,27 +54,27 @@ int main(int argc, char *argv[])
 
 
     // Attachement du socket à l'interface
-    if (bind(socketEcoute, (struct sockaddr *) &pointDeRencontreLocal, longueurAdresse) < 0)
+    if (bind(socketServeur, (struct sockaddr *) &pointDeRencontreLocal, longueurAdresse) < 0)
     {
-        perror("Erreur dans l'attachement");
+        perror("Erreur dans l'attachement\n");
         exit(-2);
     }
 
     printf("Socket attaché\n");
 
     // Écoute
-    if (listen(socketEcoute, 1) < 0)
+    if (listen(socketServeur, 1) < 0)
     {
-        perror("Erreur d'écoute");
+        perror("Erreur d'écoute\n");
         exit(-3);
     }
 
     printf("Socket en écoute\n");
 
+    srand(time(NULL));
+
     while (1) {
-        // Création d'une variable pour la saisie utilisateur
-        char saisieClient[BUFFER_SIZE];
-        memset(saisieClient, 'a', BUFFER_SIZE * sizeof(char));
+        // Message d'attente
         printf("Attente d'une connexion (Quitter avec Ctrl-C)\n\n");
 
         // Création de la strcuture sockaddr_in pour identifier la machine du client
@@ -80,18 +82,18 @@ int main(int argc, char *argv[])
         // (elle est automatiquement remplie par la fonction accept à la connexion du client)
         // (c'est pour ca qu'on passe l'adresse des variables)
         struct sockaddr_in pointDeRencontreDistant;
-        int socketDialogue = accept(socketEcoute, (struct sockaddr *) &pointDeRencontreDistant, &longueurAdresse);
-        if (socketDialogue < 0)
+        int socketJoueur = accept(socketServeur, (struct sockaddr *) &pointDeRencontreDistant, &longueurAdresse);
+        if (socketJoueur < 0)
         {
-            perror("Erreur de connexion du client");
-            close(socketDialogue);
-            close(socketEcoute);
+            perror("Erreur de connexion du client\n");
+            close(socketJoueur);
+            close(socketServeur);
             exit(-4);
         }
 
         printf("Client connecté");
 
-        // Lancement d'une partie
+        // ----- Lancement d'une partie -----
 
         // Création de la grille vide
         char grille[3][3] = {
@@ -100,24 +102,98 @@ int main(int argc, char *argv[])
             {' ', ' ', ' '}
         };
 
-        // Envoi au client de la grille et du message start
+        // Envoi au client du message start
         char startMessage[] = "La partie commence\n";
-        if (send(socketDialogue, startMessage, strlen(startMessage), 0) < 0)
+        switch (send(socketJoueur, startMessage, strlen(startMessage) + 1, 0))
         {
-            perror("Erreur de l'envoi du message start");
-            exit(-5);
+            case -1:
+                perror("Erreur de l'envoi du message start\n");
+                exit(-5);
+
+            case 0:
+                fprintf(stderr, "Le socket à été fermé par le serveur\n");
+                return 0;
         }
 
-        // Tant que la grille n'est pas pleine et que personne n'a gagné (à rajouter)
+        // Tant que la grille n'est pas pleine
         while (!estPleine(grille))
         {
-            // On envoie la grille au client
-            // On recoit son info
-            // On met a jour
-            // On check si la game est finie
-            // Si oui on close les trucs
-            // Si non on joue une case random et ca boucle
-            printf("TODO");
+            // Envoi au client de la grille
+            switch (send(socketJoueur, grille, sizeof(grille), 0))
+            {
+                case -1:
+                    perror("Erreur dans l'envoi de la grille\n");
+                    exit(-6);
+
+                case 0:
+                    fprintf(stderr, "Le socket a été fermé par le serveur\n");
+                    return 0;
+            }
+
+            /*
+                Création d'une variable pour la saisie utilisateur
+                (Nombre entre 1 et 9 pour la case choisie selon le pattern ci-dessous)
+                +-----------+
+                | 1 | 2 | 3 |
+                |-----------|
+                | 4 | 5 | 6 |
+                |-----------|
+                | 7 | 8 | 9 |
+                +-----------+
+            */
+            int saisieClient;
+
+            // Réception de la saisie du joueur
+            switch (recv(socketJoueur, &saisieClient, sizeof(int), 0))
+            {
+                case -1:
+                    perror("Erreur de réception de la saisie utilisateur\n");
+                    exit(-7);
+
+                case 0:
+                    fprintf(stderr, "Le socket a été fermé par le serveur\n");
+                    return 0;
+            }
+
+            // Décrémentation de la case choisie pour un traitement plus simple
+            saisieClient--;
+
+            // Mise à jour de la grille
+            grille[saisieClient / 3][saisieClient % 3] = 'X';
+
+            // Si la grille n'est pas pleine
+            if (!estPleine(grille))
+            {
+
+                // On joue une case aléatoire
+                int caseRandom;
+
+                do
+                {
+                    caseRandom = rand() % 9;
+                } while (grille[caseRandom / 3][caseRandom % 3] != ' ');
+
+                grille[caseRandom / 3][caseRandom % 3] = 'O';
+            }
         }
+
+        // La grille est pleine donc on affiche un message de fin et on l'envoie au client
+        char messageFin[] = "Partie terminée, la grille est pleine, personne n'a gagné";
+        printf("%s\n", messageFin);
+        switch (send(socketJoueur, messageFin, strlen(messageFin) + 1, 0))
+        {
+            case -1:
+                perror("Erreur dans l'envoi du message de fin\n");
+                exit(-8);
+
+            case 0:
+                fprintf(stderr, "Le socket a été fermé par le serveur\n");
+                return 0;
+        }
+
+        close(socketJoueur);
     }
+
+    close(socketServeur);
+    return 0;
 }
