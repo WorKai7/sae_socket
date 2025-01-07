@@ -158,8 +158,13 @@ int main(int argc, char *argv[])
             // Décrémentation de la case choisie pour un traitement plus simple
             saisieClient--;
 
+            // Ici on pourra rajouter un bloc de code pour checker si la saisie est valide et sinon on redemande au client
+            // Et si la saisie est valide on met à jour la grille (la ligne juste en dessous) et on la lui envoie
+
             // Mise à jour de la grille
             grille[saisieClient / 3][saisieClient % 3] = 'X';
+
+            // Donc ici on enverra la grille
 
             // Si la grille n'est pas pleine
             if (!estPleine(grille))
