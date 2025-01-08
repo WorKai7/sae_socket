@@ -60,6 +60,32 @@ int estPleine(char grille[3][3])
     return 1;
 }
 
+
+// Fonction renvoyant 0 si personne n'a gagné, 1 si le joueur X a gagné et 2 si le joueur O à gagné
+int estGagnante(char grille[3][3])
+{
+    for (int i = 0; i < 3; i++)
+    {
+        // Vérifie la ligne
+        if (grille[i][0] == grille[i][1] && grille[i][1] == grille[i][2] && grille[i][0] != ' ')
+            return grille[i][0] == 'X' ? 1 : 2;
+
+        // Vérifie la colonne
+        if (grille[0][i] == grille[1][i] && grille[1][i] == grille[2][i] && grille[0][i] != ' ')
+            return grille[0][i] == 'X' ? 1 : 2;
+    }
+
+    // Vérifie les diagonales
+    if (grille[0][0] == grille[1][1] && grille[1][1] == grille[2][2] && grille[0][0] != ' ')
+        return grille[0][0] == 'X' ? 1 : 2;
+
+    if (grille[0][2] == grille[1][1] && grille[1][1] == grille[2][0] && grille[0][2] != ' ')
+        return grille[0][2] == 'X' ? 1 : 2;
+
+    return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
     // Création du socket
@@ -182,6 +208,26 @@ int main(int argc, char *argv[])
             // Envoi de la grille intermediaire
             envoyer(&socketJoueur, grille, sizeof(grille));
 
+            
+            // Si il y a une victoire
+            printf("Victoire: %d\n", estGagnante(grille));
+            if (estGagnante(grille) != 0)
+            {
+                // Envoi d'un message pour que le client sache que la partie est terminée
+                char msg[] = "end";
+                envoyer(&socketJoueur, msg, strlen(msg));
+
+                // Envoi du message de fin
+                char messageFin[256];
+                sprintf(messageFin, "Partie terminée, le joueur %c a gagné", estGagnante(grille) == 1 ? 'X' : 'O');
+                printf("%s\n", messageFin);
+
+                envoyer(&socketJoueur, messageFin, strlen(messageFin));
+
+                close(socketJoueur);
+                break;
+            }
+
             // Si la grille n'est pas pleine
             if (!estPleine(grille))
             {
@@ -206,13 +252,15 @@ int main(int argc, char *argv[])
             }
         }
 
-        // La grille est pleine donc on affiche un message de fin et on l'envoie au client
-        char messageFin[] = "Partie terminée, la grille est pleine, personne n'a gagné";
-        char msg[] = "end";
-        printf("%s\n", messageFin);
+        if (estPleine(grille)) {
+            // La grille est pleine donc on affiche un message de fin et on l'envoie au client
+            char messageFin[] = "Partie terminée, la grille est pleine, personne n'a gagné";
+            char msg[] = "end";
+            printf("%s\n", messageFin);
 
-        envoyer(&socketJoueur, msg, strlen(msg));
-        envoyer(&socketJoueur, messageFin, strlen(messageFin));
+            envoyer(&socketJoueur, msg, strlen(msg));
+            envoyer(&socketJoueur, messageFin, strlen(messageFin));
+        }
 
         close(socketJoueur);
     }

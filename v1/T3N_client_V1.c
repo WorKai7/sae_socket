@@ -58,14 +58,14 @@ int main(int argc, char *argv[])
 
     char ip[16];
     int port;
-    if (argc > 1)
+    if (argc > 2)
     {
         strncpy(ip, argv[1], 16);
         sscanf(argv[2], "%d", &port);
     }
     else
     {
-        printf("USAGE : %s [ip] [port]\n", argv[0]);
+        printf("USAGE : %s [ip] [port]\nIl manque un argument\n", argv[0]);
         exit(-1);
     }
 
