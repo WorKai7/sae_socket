@@ -26,6 +26,7 @@ void envoyer(int *socket, const void * message, size_t taille)
     }
 }
 
+
 void recevoir(int *socket, void * message, size_t taille)
 {
     switch (recv(*socket, message, taille, 0))
@@ -39,6 +40,24 @@ void recevoir(int *socket, void * message, size_t taille)
             close(*socket);
             exit(0);
     }
+}
+
+
+// Fonction renvoyant 1 si la grille est pleine et 0 sinon
+int estPleine(char grille[3][3])
+{
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            if (grille[i][j] == ' ')
+            {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
 }
 
 int main(int argc, char *argv[])
@@ -124,8 +143,8 @@ int main(int argc, char *argv[])
         char startMessage[] = "La partie commence\n";
         envoyer(&socketJoueur, startMessage, strlen(startMessage));
 
-        // Boucle du jeu
-        while (1)
+        // Tant que la grille n'est pas pleine
+        while (!estPleine(grille))
         {
             // Envoi au client de la grille
             usleep(5000); // Sécurité pour s'assurer que le serveur n'envoie pas la grille avant que le client l'attende
@@ -141,12 +160,21 @@ int main(int argc, char *argv[])
                 +-----------+
             */
             int saisieClient;
+            int estValide;
 
             // Réception de la saisie du joueur tant qu'elle n'est pas valide
-            recevoir(&socketJoueur, &saisieClient, sizeof(int));
+            do
+            {
+                recevoir(&socketJoueur, &saisieClient, sizeof(saisieClient));
 
-            // Décrémentation de la case choisie pour un traitement plus simple
-            saisieClient--;
+                // Décrémentation de la case choisie pour un traitement plus simple
+                saisieClient--;
+
+                // Vérification que la case entrée est valide
+                estValide = grille[saisieClient / 3][saisieClient % 3] == ' ';
+
+                envoyer(&socketJoueur, &estValide, sizeof(estValide));
+            } while (!estValide);
 
             // Mise à jour de la grille
             grille[saisieClient / 3][saisieClient % 3] = 'X';
@@ -154,11 +182,37 @@ int main(int argc, char *argv[])
             // Envoi de la grille intermediaire
             envoyer(&socketJoueur, grille, sizeof(grille));
 
-            // On joue une case aléatoire
-            int caseRandom = rand() % 9;
+            // Si la grille n'est pas pleine
+            if (!estPleine(grille))
+            {
 
-            grille[caseRandom / 3][caseRandom % 3] = 'O';
+                // On joue une case aléatoire
+                int caseRandom;
+
+                do
+                {
+                    caseRandom = rand() % 9;
+                } while (grille[caseRandom / 3][caseRandom % 3] != ' ');
+
+                grille[caseRandom / 3][caseRandom % 3] = 'O';
+
+
+                if (!estPleine(grille))
+                {
+                    // Envoi d'un message pour que le client sache que la partie continue
+                    char msg[] = "continue";
+                    envoyer(&socketJoueur, msg, strlen(msg));
+                }
+            }
         }
+
+        // La grille est pleine donc on affiche un message de fin et on l'envoie au client
+        char messageFin[] = "Partie terminée, la grille est pleine, personne n'a gagné";
+        char msg[] = "end";
+        printf("%s\n", messageFin);
+
+        envoyer(&socketJoueur, msg, strlen(msg));
+        envoyer(&socketJoueur, messageFin, strlen(messageFin));
 
         close(socketJoueur);
     }
