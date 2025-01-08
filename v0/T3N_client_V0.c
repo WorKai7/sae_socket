@@ -12,7 +12,7 @@
 void envoyer(int *socket, const void * message, size_t taille)
 {
     switch (send(*socket, message, taille, 0))
-    {
+    {   
         case -1:
             perror("Erreur d'écriture\n");
             exit(-5);
@@ -33,7 +33,7 @@ void recevoir(int *socket, void * message, size_t taille)
             exit(-6);
 
         case 0:
-            fprintf(stderr, "Le socket a été fermé par le client\n");
+            fprintf(stderr, "Le socket a été fermé par le serveur\n");
             close(*socket);
             exit(0);
     }
@@ -57,14 +57,14 @@ int main(int argc, char *argv[])
 
     char ip[16];
     int port;
-    if (argc > 1)
+    if (argc > 2)
     {
         strncpy(ip, argv[1], 16);
         sscanf(argv[2], "%d", &port);
     }
     else
     {
-        printf("USAGE : %s [ip] [port]\n", argv[0]);
+        printf("USAGE : %s [ip] [port]\nIl manque un argument\n", argv[0]);
         exit(-1);
     }
 
