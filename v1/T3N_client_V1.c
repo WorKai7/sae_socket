@@ -18,7 +18,7 @@ void envoyer(int *socket, const void * message, size_t taille)
             exit(-5);
 
         case 0:
-            fprintf(stderr, "Le socket a été fermé par le client\n");
+            fprintf(stderr, "Le socket a été fermé par le serveur\n");
             close(*socket);
             exit(0);
     }
@@ -34,7 +34,7 @@ void recevoir(int *socket, void * message, size_t taille)
             exit(-6);
 
         case 0:
-            fprintf(stderr, "Le socket a été fermé par le client\n");
+            fprintf(stderr, "Le socket a été fermé par le serveur\n");
             close(*socket);
             exit(0);
     }
@@ -108,13 +108,13 @@ int main(int argc, char *argv[])
     // Le message a bien été reçu: affichage de celui-ci
     printf("%s\n", reception);
 
+    // Initialisation de la grille
+    char grille[3][3];
+
     // On boucle tant que le message indique que la partie continue
     do
     {
-        char grille[3][3];
-
         // Réception de la grille
-        printf("À vous de jouer\n");
         recevoir(&socketJoueur, grille, sizeof(grille));
 
         // Variables pour la saisie utilisateur
@@ -125,6 +125,16 @@ int main(int argc, char *argv[])
         {
             // La grille a bien été reçue: affichage de celle-ci
             afficher_grille(grille);
+
+            // Vérification que la partie continue
+            memset(reception, 0x00, BUFFER_SIZE);
+            recevoir(&socketJoueur, reception, BUFFER_SIZE);
+            if (strcmp(reception, "continue") != 0)
+            {
+                break;
+            }
+
+            printf("\nÀ vous de jouer\n");
 
             // Saisie utilisateur
             printf("Entrez une case parmi les cases vides (suivant le pattern ci-dessous):\n|1 2 3|\n|4 5 6|\n|7 8 9|\n-> ");
@@ -145,18 +155,27 @@ int main(int argc, char *argv[])
         recevoir(&socketJoueur, grille, sizeof(grille));
 
         // Affichage de la grille intermediaire
-        printf("Au tour de votre adversaire\n");
         afficher_grille(grille);
 
         // Réception du message pour continuer
         memset(reception, 0x00, BUFFER_SIZE);
         recevoir(&socketJoueur, reception, BUFFER_SIZE);
 
+        if (strcmp(reception, "continue") == 0)
+        {
+            printf("\nAu tour de votre adversaire\n");
+        }
+
     } while (strcmp(reception, "continue") == 0);
 
     // Affichage du message de fin
     recevoir(&socketJoueur, reception, BUFFER_SIZE);
     printf("%s\n", reception);
+
+    // Affichage de la grille finale
+    recevoir(&socketJoueur, grille, sizeof(grille));
+    printf("\n\n\n----- Grille finale -----\n\n");
+    afficher_grille(grille);
 
     // Fermeture du socket
     close(socketJoueur);

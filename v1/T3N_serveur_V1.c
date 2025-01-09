@@ -86,6 +86,50 @@ int estGagnante(char grille[3][3])
 }
 
 
+int partieFinie(int *socket, char grille[3][3], char joueurAyantJoue)
+{
+    int gagnante = estGagnante(grille);
+    int pleine = estPleine(grille);
+
+    if (gagnante || pleine)
+    {
+        // Personalisation du message si la partie est gagnée ou juste finie
+        char msg[5];
+        char messageFin[256];
+
+        if (gagnante)
+        {
+            sprintf(msg, "%cwin", joueurAyantJoue);
+            sprintf(messageFin, "Partie terminée, le joueur %c a gagné !", joueurAyantJoue);
+        }
+        else
+        {
+            sprintf(msg, "%cend", joueurAyantJoue);
+            strcpy(messageFin, "Partie terminée, personne n'a gagné !");
+        }
+
+        // Envoi d'un message pour que le client sache que la partie est terminée
+        envoyer(socket, msg, strlen(msg));
+
+        // Affichage du message de fin du côté serveur
+        printf("%s\n", messageFin);
+
+        // Envoi du message de fin
+        usleep(5000); // Pour que le client ai le temps d'afficher le message de fin avant d'être fermé
+        envoyer(socket, messageFin, strlen(messageFin));
+
+        // Envoi de la grille finale
+        usleep(5000);
+        envoyer(socket, grille, 9);
+
+        close(*socket);
+        return 1;
+    }
+
+    return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
     // Création du socket
@@ -167,14 +211,18 @@ int main(int argc, char *argv[])
 
         // Envoi au client du message start
         char startMessage[] = "La partie commence\n";
+        char continueMessage[] = "continue";
         envoyer(&socketJoueur, startMessage, strlen(startMessage));
 
-        // Tant que la grille n'est pas pleine
-        while (!estPleine(grille))
+        // Boucle du jeu
+        while (1)
         {
             // Envoi au client de la grille
             usleep(5000); // Sécurité pour s'assurer que le serveur n'envoie pas la grille avant que le client l'attende
             envoyer(&socketJoueur, grille, sizeof(grille));
+
+            // Envoi d'un message pour que le client sache que la partie continue
+            envoyer(&socketJoueur, continueMessage, strlen(continueMessage));
 
             /*
                 Création d'une variable pour la saisie utilisateur
@@ -199,7 +247,14 @@ int main(int argc, char *argv[])
                 // Vérification que la case entrée est valide
                 estValide = grille[saisieClient / 3][saisieClient % 3] == ' ';
 
+                // Envoi de la confirmation au client
                 envoyer(&socketJoueur, &estValide, sizeof(estValide));
+
+                // Si la confirmation n'est pas bonne, on envoie un message pour lui dire de continuer
+                if (!estValide)
+                {
+                    envoyer(&socketJoueur, continueMessage, strlen(continueMessage));
+                }
             } while (!estValide);
 
             // Mise à jour de la grille
@@ -208,61 +263,34 @@ int main(int argc, char *argv[])
             // Envoi de la grille intermediaire
             envoyer(&socketJoueur, grille, sizeof(grille));
 
-            
-            // Si il y a une victoire
-            printf("Victoire: %d\n", estGagnante(grille));
-            if (estGagnante(grille) != 0)
+            // Si la partie est terminée, la fonction gère tout et on sort de la boucle
+            if (partieFinie(&socketJoueur, grille, 'X'))
             {
-                // Envoi d'un message pour que le client sache que la partie est terminée
-                char msg[] = "end";
-                envoyer(&socketJoueur, msg, strlen(msg));
-
-                // Envoi du message de fin
-                char messageFin[256];
-                sprintf(messageFin, "Partie terminée, le joueur %c a gagné", estGagnante(grille) == 1 ? 'X' : 'O');
-                printf("%s\n", messageFin);
-
-                envoyer(&socketJoueur, messageFin, strlen(messageFin));
-
-                close(socketJoueur);
                 break;
             }
 
-            // Si la grille n'est pas pleine
-            if (!estPleine(grille))
+            // La partie n'est pas terminée, on envoie le message pour continuer
+            envoyer(&socketJoueur, continueMessage, strlen(continueMessage));
+
+            // On joue une case aléatoire
+            int caseRandom;
+
+            do
             {
+                caseRandom = rand() % 9;
+            } while (grille[caseRandom / 3][caseRandom % 3] != ' ');
 
-                // On joue une case aléatoire
-                int caseRandom;
+            // Mise à jour de la grille
+            grille[caseRandom / 3][caseRandom % 3] = 'O';
 
-                do
-                {
-                    caseRandom = rand() % 9;
-                } while (grille[caseRandom / 3][caseRandom % 3] != ' ');
-
-                grille[caseRandom / 3][caseRandom % 3] = 'O';
-
-
-                if (!estPleine(grille))
-                {
-                    // Envoi d'un message pour que le client sache que la partie continue
-                    char msg[] = "continue";
-                    envoyer(&socketJoueur, msg, strlen(msg));
-                }
+            // Si la partie est terminée, la fonction gère tout et on sort de la boucle
+            if (partieFinie(&socketJoueur, grille, 'O'))
+            {
+                break;
             }
+
+            // La partie n'est pas terminée, on boucle
         }
-
-        if (estPleine(grille)) {
-            // La grille est pleine donc on affiche un message de fin et on l'envoie au client
-            char messageFin[] = "Partie terminée, la grille est pleine, personne n'a gagné";
-            char msg[] = "end";
-            printf("%s\n", messageFin);
-
-            envoyer(&socketJoueur, msg, strlen(msg));
-            envoyer(&socketJoueur, messageFin, strlen(messageFin));
-        }
-
-        close(socketJoueur);
     }
 
     close(socketServeur);
