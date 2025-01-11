@@ -27,13 +27,13 @@ et de gagner ou de perdre.
 - Cette version implique maintenant 2 clients au lieu d'un,
 les deux clients s'affrontent et le serveur sert uniquement à arbitrer.
 
-- Elle est fonctionnelle
+- Elle est complètement terminée et testée
 
 #### Version 3 (v3)
 - Cette version implique la connexion de spectateurs pour visionner
 la partie en cours.
 
-- Elle n'existe pas
+- Elle est complètement terminée et testée
 
 #### Version 4 (v4)
 - Cette version permet au serveur de faire joueur plusieurs parties
@@ -48,19 +48,27 @@ Pour l'instant, aucune dépendance n'est nécessaire, seulement une machine pouv
 Ouvrez deux terminal dans le dossier de la version que vous voulez executer,
 Tapez les commandes suivantes en remplacant le X par la version correspondante:
 
-#### Compilation
+#### Compilation (v0, v1 et v2)
 ```
 gcc T3N_serveur_VX.c -o serveur
 gcc T3N_client_VX.c -o client
 ```
 
+#### Compilation (v3)
+```
+gcc -pthread T3N_serveur_V3.c -o serveur
+gcc T3N_client_V3.c -o client
+```
+
 #### Exécution
 Exécutez ces deux commandes chacune dans un terminal différent.
-Veillez a bien exécuter le serveur AVANT d'exécuter le client
+Veillez a bien exécuter le serveur AVANT d'exécuter le(s) client(s)
 ```
 ./serveur
 ./client
 ```
+
+Note: Pour faire fonctionner la v0 et la v1, il faut simplement exécuter un serveur puis un client, à partir de la v2, vous devrez exécuter un serveur et 2 clients (ou plus pour les spéctateurs dans la v3)
 
 ## Membres du projet
 - Vandewalle Jérôme (responsable dépôt)
