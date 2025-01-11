@@ -122,13 +122,17 @@ int partieFinie(int *socket1, int *socket2, char grille[3][3], char joueurAyantJ
         // Envoi du message de fin
         envoyer(socket1, messageFin, strlen(messageFin));
         envoyer(socket2, messageFin, strlen(messageFin));
+        envoyerAuxSpectateurs(messageFin, strlen(messageFin));
 
         // Envoi de la grille finale
         envoyer(socket1, grille, 9);
         envoyer(socket2, grille, 9);
+        envoyerAuxSpectateurs(grille, 9);
 
         close(*socket1);
         close(*socket2);
+        nbSpectateurs = 100; // Pour arreter la boucle du thread
+        printf("%d", nbSpectateurs);
         return 1;
     }
 
@@ -140,6 +144,7 @@ void *acceptSpectators()
 {
     while (nbSpectateurs < MAX_SPECTATORS)
     {
+        printf("Attente d'un spectateur, nb: %d\n", nbSpectateurs);
         struct sockaddr_in specAddr;
         socklen_t addrLen = sizeof(specAddr);
 
@@ -161,7 +166,6 @@ void *acceptSpectators()
         printf("Spectateur n°%d connecté\n", nbSpectateurs);
     }
 
-    // On accepte plus de spectateurs après la limite
     pthread_exit(NULL);
 }
 
@@ -304,10 +308,12 @@ int main(int argc, char *argv[])
             envoyer(&socketClient2, continueMessage, strlen(continueMessage));
 
             // Envoi du tour, grille et message aux spectateurs
+            envoyerAuxSpectateurs(continueMessage, strlen(continueMessage));
             envoyerAuxSpectateurs(&tour, sizeof(tour));
             envoyerAuxSpectateurs(grille, sizeof(grille));
-            envoyerAuxSpectateurs(continueMessage, strlen(continueMessage));
         }
+        nbSpectateurs = 0;
+        pthread_join(thread, NULL);
     }
 
     close(socketServeur);

@@ -33,7 +33,7 @@ les deux clients s'affrontent et le serveur sert uniquement à arbitrer.
 - Cette version implique la connexion de spectateurs pour visionner
 la partie en cours.
 
-- Elle est complètement terminée et testée
+- Elle est complètement terminée et testée (il y a juste un problème, nous ne pouvons pas jouer plusieurs parties sans redemarrer le serveur)
 
 #### Version 4 (v4)
 - Cette version permet au serveur de faire joueur plusieurs parties
