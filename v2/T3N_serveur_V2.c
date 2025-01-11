@@ -15,6 +15,7 @@
 // Fonction permettant d'envoyer un message a un client
 void envoyer(int *socket, const void *message, size_t taille) 
 {
+    usleep(5000); // Pour que le client ai le temps d'afficher le message de fin avant d'être fermé
     if (send(*socket, message, taille, 0) <= 0) {
         perror("Erreur d'envoi");
         close(*socket);
@@ -72,6 +73,51 @@ int estGagnante(char grille[3][3])
 }
 
 
+int partieFinie(int *socket1, int *socket2, char grille[3][3], char joueurAyantJoue)
+{
+    int gagnante = estGagnante(grille);
+    int pleine = estPleine(grille);
+
+    if (gagnante || pleine)
+    {
+        // Personalisation du message si la partie est gagnée ou juste finie
+        char msg[5];
+        char messageFin[256];
+
+        if (gagnante)
+        {
+            sprintf(msg, "%cwin", joueurAyantJoue);
+            sprintf(messageFin, "Partie terminée, le joueur %c a gagné !", joueurAyantJoue);
+        }
+        else
+        {
+            sprintf(msg, "%cend", joueurAyantJoue);
+            strcpy(messageFin, "Partie terminée, personne n'a gagné !");
+        }
+
+        // Envoi d'un message pour que le client sache que la partie est terminée
+        envoyer(socket1, msg, strlen(msg));
+        envoyer(socket2, msg, strlen(msg));
+
+        // Affichage du message de fin du côté serveur
+        printf("%s\n", messageFin);
+
+        // Envoi du message de fin
+        envoyer(socket1, messageFin, strlen(messageFin));
+        envoyer(socket2, messageFin, strlen(messageFin));
+
+        // Envoi de la grille finale
+        envoyer(socket1, grille, 9);
+        envoyer(socket2, grille, 9);
+
+        close(*socket1);
+        close(*socket2);
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) 
 {
     // Création du socket
@@ -123,12 +169,19 @@ int main(int argc, char *argv[])
     }
     printf("Client 1 connecté\n");
 
+    char symbol1 = 'X';
+    envoyer(&socketClient1, &symbol1, sizeof(char));
+
     int socketClient2 = accept(socketServeur, (struct sockaddr*)&clientAddr2, &addrLen);
     if (socketClient2 < 0) {
         perror("Erreur de connexion du client 2");
         exit(EXIT_FAILURE);
     }
     printf("Client 2 connecté\n");
+
+    char symbol2 = 'O';
+    envoyer(&socketClient2, &symbol2, sizeof(char));
+
 
     // Initialisation de la grille
     char grille[3][3] = {
@@ -137,67 +190,64 @@ int main(int argc, char *argv[])
         {' ', ' ', ' '}
     };
 
+    char continueMessage[] = "continue";
+
     // Envoi du message de debut de la partie
-    char startMsg[] = "La partie commence. Vous êtes respectivement X et O.\n";
+    char startMsg[] = "La partie commence.\n";
     envoyer(&socketClient1, startMsg, strlen(startMsg));
     envoyer(&socketClient2, startMsg, strlen(startMsg));
 
-    int joueurActuel = 1; // CHANGE : 1 pour le joueur X, 2 pour le joueur O
+    char tour = 'X';
 
 
     // ----- Boucle du serveur -----
 
 
-    while (!estPleine(grille) && estGagnante(grille) == 0) 
+    while (1)
     {
-        int socketActuel = (joueurActuel == 1) ? socketClient1 : socketClient2;
-        int socketAdverse = (joueurActuel == 1) ? socketClient2 : socketClient1;
+        // Envoi du tour aux clients
+        envoyer(&socketClient1, &tour, sizeof(tour));
+        envoyer(&socketClient2, &tour, sizeof(tour));
 
-        // Envoi de la grille au joueur actuel
-        envoyer(&socketActuel, grille, sizeof(grille));
+        // Envoi de la grille aux clients
+        envoyer(&socketClient1, grille, sizeof(grille));
+        envoyer(&socketClient2, grille, sizeof(grille));
 
-        // Reception du coup
-        int choix;
-        int valide;
-        do 
+        // On récupère le socket du joueur qui joue
+        int socketActuel = (tour == symbol1) ? socketClient1 : socketClient2;
+
+        int saisieClient;
+        int estValide;
+
+        // Réception de la saisie du joueur tant qu'elle n'est pas valide
+        do
         {
-            recevoir(&socketActuel, &choix, sizeof(choix));
-            choix--; // Adapter l'entrée utilisateur (1-9) à l'index de la grille
-            valide = grille[choix / 3][choix % 3] == ' '; // Vérifier si la case est vide
-            envoyer(&socketActuel, &valide, sizeof(valide));
-        } while (!valide);
+            recevoir(&socketActuel, &saisieClient, sizeof(saisieClient));
 
-        // Mise a jour de la grille
-        grille[choix / 3][choix % 3] = (joueurActuel == 1) ? 'X' : 'O';
+            // Décrémentation de la case choisie pour un traitement plus simple
+            saisieClient--;
 
-        // On vérifie si un joueur a gagné
-        if (estGagnante(grille) != 0) break;
+            // Vérification que la case entrée est valide
+            estValide = grille[saisieClient / 3][saisieClient % 3] == ' ';
 
-        // Envoi de la grille a l'adversaire
-        envoyer(&socketAdverse, grille, sizeof(grille));
+            // Envoi de la confirmation au client
+            envoyer(&socketActuel, &estValide, sizeof(estValide));
+        } while (!estValide);
 
-        // L'autre joueur devient le joueur actif
-        joueurActuel = 3 - joueurActuel;
+        // Mise à jour de la grille
+        grille[saisieClient / 3][saisieClient % 3] = tour;
+
+        // Sortie de boucle si la partie est terminée 
+        if (partieFinie(&socketClient1, &socketClient2, grille, tour)) break;
+
+        // Changement de joueur
+        tour = tour == 'X' ? 'O' : 'X';
+
+        // Envoi du message pour continuer et boucle
+        envoyer(&socketClient1, continueMessage, strlen(continueMessage));
+        envoyer(&socketClient2, continueMessage, strlen(continueMessage));
     }
 
-    // Envoi de la grille finale avec un message de fin
-    envoyer(&socketClient1, grille, sizeof(grille));
-    envoyer(&socketClient2, grille, sizeof(grille));
-
-    char finMsg[BUFFER_SIZE];
-    if (estGagnante(grille) != 0) 
-    {
-        sprintf(finMsg, "Le joueur %c a gagné !\n", (estGagnante(grille) == 1) ? 'X' : 'O');
-    } else {
-        sprintf(finMsg, "Match nul !\n");
-    }
-    envoyer(&socketClient1, finMsg, strlen(finMsg));
-    envoyer(&socketClient2, finMsg, strlen(finMsg));
-
-    // Fermeture des sockets
-    close(socketClient1);
-    close(socketClient2);
     close(socketServeur);
-
     return 0;
 }
