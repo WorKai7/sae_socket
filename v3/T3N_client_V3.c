@@ -121,14 +121,28 @@ int main(int argc, char *argv[])
         do
         {
             printf("En attente du prochain tour..");
+
+            recevoir(&socketJoueur, reception, BUFFER_SIZE);
+
+            if (strcmp(reception, "continue") != 0) break;
+
             recevoir(&socketJoueur, &tourActuel, sizeof(tourActuel));
             printf("TOUR: %c", tourActuel);
 
             recevoir(&socketJoueur, grille, sizeof(grille));
             afficher_grille(grille);
 
-            recevoir(&socketJoueur, reception, BUFFER_SIZE);
         } while (strcmp(reception, "continue") == 0);
+
+        // Affichage du message de fin
+        recevoir(&socketJoueur, reception, BUFFER_SIZE);
+        printf("\n%s\n", reception);
+
+        // Récupération de la grille finale
+        recevoir(&socketJoueur, grille, sizeof(grille));
+        printf("\n\nGrille finale:\n\n");
+        afficher_grille(grille);
+        return 0;
     }
 
     
@@ -196,7 +210,6 @@ int main(int argc, char *argv[])
     } while (strcmp(reception, "continue") == 0);
 
     // Affichage du message de fin
-    memset(reception, 0, BUFFER_SIZE);
     recevoir(&socketJoueur, reception, BUFFER_SIZE);
     printf("\n%s\n", reception);
 
