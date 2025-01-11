@@ -156,96 +156,99 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("En attente de connexions...\n");
-
     struct sockaddr_in clientAddr1, clientAddr2;
     socklen_t addrLen = sizeof(clientAddr1);
 
-    // Acceptation les connexions client
-    int socketClient1 = accept(socketServeur, (struct sockaddr*)&clientAddr1, &addrLen);
-    if (socketClient1 < 0) {
-        perror("Erreur de connexion du client 1");
-        exit(EXIT_FAILURE);
-    }
-    printf("Client 1 connecté\n");
-
-    char symbol1 = 'X';
-    envoyer(&socketClient1, &symbol1, sizeof(char));
-
-    int socketClient2 = accept(socketServeur, (struct sockaddr*)&clientAddr2, &addrLen);
-    if (socketClient2 < 0) {
-        perror("Erreur de connexion du client 2");
-        exit(EXIT_FAILURE);
-    }
-    printf("Client 2 connecté\n");
-
-    char symbol2 = 'O';
-    envoyer(&socketClient2, &symbol2, sizeof(char));
-
-
-    // Initialisation de la grille
-    char grille[3][3] = {
-        {' ', ' ', ' '},
-        {' ', ' ', ' '},
-        {' ', ' ', ' '}
-    };
-
-    char continueMessage[] = "continue";
-
-    // Envoi du message de debut de la partie
-    char startMsg[] = "La partie commence.\n";
-    envoyer(&socketClient1, startMsg, strlen(startMsg));
-    envoyer(&socketClient2, startMsg, strlen(startMsg));
-
-    char tour = 'X';
-
-
-    // ----- Boucle du serveur -----
-
-
     while (1)
     {
-        // Envoi du tour aux clients
-        envoyer(&socketClient1, &tour, sizeof(tour));
-        envoyer(&socketClient2, &tour, sizeof(tour));
+        printf("En attente de connexions...\n");
 
-        // Envoi de la grille aux clients
-        envoyer(&socketClient1, grille, sizeof(grille));
-        envoyer(&socketClient2, grille, sizeof(grille));
+        // Acceptation les connexions client
+        int socketClient1 = accept(socketServeur, (struct sockaddr*)&clientAddr1, &addrLen);
+        if (socketClient1 < 0) {
+            perror("Erreur de connexion du client 1");
+            exit(EXIT_FAILURE);
+        }
+        printf("Client 1 connecté\n");
 
-        // On récupère le socket du joueur qui joue
-        int socketActuel = (tour == symbol1) ? socketClient1 : socketClient2;
+        char symbol1 = 'X';
+        envoyer(&socketClient1, &symbol1, sizeof(char));
 
-        int saisieClient;
-        int estValide;
+        int socketClient2 = accept(socketServeur, (struct sockaddr*)&clientAddr2, &addrLen);
+        if (socketClient2 < 0) {
+            perror("Erreur de connexion du client 2");
+            exit(EXIT_FAILURE);
+        }
+        printf("Client 2 connecté\n");
 
-        // Réception de la saisie du joueur tant qu'elle n'est pas valide
-        do
+        char symbol2 = 'O';
+        envoyer(&socketClient2, &symbol2, sizeof(char));
+
+
+        // Initialisation de la grille
+        char grille[3][3] = {
+            {' ', ' ', ' '},
+            {' ', ' ', ' '},
+            {' ', ' ', ' '}
+        };
+
+        char continueMessage[] = "continue";
+
+        // Envoi du message de debut de la partie
+        char startMsg[] = "La partie commence.\n";
+        envoyer(&socketClient1, startMsg, strlen(startMsg));
+        envoyer(&socketClient2, startMsg, strlen(startMsg));
+
+        char tour = 'X';
+
+
+        // ----- Boucle du serveur -----
+
+
+        while (1)
         {
-            recevoir(&socketActuel, &saisieClient, sizeof(saisieClient));
+            // Envoi du tour aux clients
+            envoyer(&socketClient1, &tour, sizeof(tour));
+            envoyer(&socketClient2, &tour, sizeof(tour));
 
-            // Décrémentation de la case choisie pour un traitement plus simple
-            saisieClient--;
+            // Envoi de la grille aux clients
+            envoyer(&socketClient1, grille, sizeof(grille));
+            envoyer(&socketClient2, grille, sizeof(grille));
 
-            // Vérification que la case entrée est valide
-            estValide = grille[saisieClient / 3][saisieClient % 3] == ' ';
+            // On récupère le socket du joueur qui joue
+            int socketActuel = (tour == symbol1) ? socketClient1 : socketClient2;
 
-            // Envoi de la confirmation au client
-            envoyer(&socketActuel, &estValide, sizeof(estValide));
-        } while (!estValide);
+            int saisieClient;
+            int estValide;
 
-        // Mise à jour de la grille
-        grille[saisieClient / 3][saisieClient % 3] = tour;
+            // Réception de la saisie du joueur tant qu'elle n'est pas valide
+            do
+            {
+                recevoir(&socketActuel, &saisieClient, sizeof(saisieClient));
 
-        // Sortie de boucle si la partie est terminée 
-        if (partieFinie(&socketClient1, &socketClient2, grille, tour)) break;
+                // Décrémentation de la case choisie pour un traitement plus simple
+                saisieClient--;
 
-        // Changement de joueur
-        tour = tour == 'X' ? 'O' : 'X';
+                // Vérification que la case entrée est valide
+                estValide = grille[saisieClient / 3][saisieClient % 3] == ' ';
 
-        // Envoi du message pour continuer et boucle
-        envoyer(&socketClient1, continueMessage, strlen(continueMessage));
-        envoyer(&socketClient2, continueMessage, strlen(continueMessage));
+                // Envoi de la confirmation au client
+                envoyer(&socketActuel, &estValide, sizeof(estValide));
+            } while (!estValide);
+
+            // Mise à jour de la grille
+            grille[saisieClient / 3][saisieClient % 3] = tour;
+
+            // Sortie de boucle si la partie est terminée 
+            if (partieFinie(&socketClient1, &socketClient2, grille, tour)) break;
+
+            // Changement de joueur
+            tour = tour == 'X' ? 'O' : 'X';
+
+            // Envoi du message pour continuer et boucle
+            envoyer(&socketClient1, continueMessage, strlen(continueMessage));
+            envoyer(&socketClient2, continueMessage, strlen(continueMessage));
+        }
     }
 
     close(socketServeur);
